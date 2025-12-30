@@ -247,53 +247,178 @@ class EPUBParser {
 
             const chapterStartIndex = chunks.length; // Track where this chapter starts
 
-            // Use regex to match complete paragraph tags
-            const paraRegex = /<p[^>]*>.*?<\/p>/gi;
-            const paragraphs = chapter.content.match(paraRegex) || [];
+            // Parse HTML to extract paragraphs in order
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(chapter.content, 'text/html');
             
-            // Also handle divs as paragraphs
-            const divRegex = /<div[^>]*>.*?<\/div>/gi;
-            const divs = chapter.content.match(divRegex) || [];
+            // Get all paragraph and div elements in document order (top-level only)
+            const allElements = [];
             
-            // Combine and process all paragraph-like elements
-            let allParagraphs = [...paragraphs, ...divs].filter(p => {
-                const textOnly = p.replace(/<[^>]*>/g, '').trim();
-                return textOnly.length > 0;
-            });
+            // Process direct children of body first, then nested elements
+            const processNode = (node) => {
+                const tagName = node.tagName ? node.tagName.toLowerCase() : '';
+                
+                if (tagName === 'p' || tagName === 'div') {
+                    const innerHTML = node.innerHTML.trim();
+                    const textOnly = node.textContent.trim();
+                    
+                    if (textOnly.length > 0) {
+                        allElements.push({
+                            tag: tagName,
+                            html: `<${tagName}>${innerHTML}</${tagName}>`,
+                            textLength: textOnly.length
+                        });
+                        return; // Don't process children if we've added this node
+                    }
+                }
+                
+                // Process children
+                if (node.children) {
+                    Array.from(node.children).forEach(child => processNode(child));
+                }
+            };
             
-            // If no paragraphs found, treat entire content as one paragraph
-            if (allParagraphs.length === 0) {
+            // Start processing from body
+            if (doc.body) {
+                Array.from(doc.body.children).forEach(child => processNode(child));
+            }
+
+            // If no structured elements found, use the content as-is
+            if (allElements.length === 0) {
                 const textOnly = chapter.content.replace(/<[^>]*>/g, '').trim();
                 if (textOnly.length > 0) {
-                    // Wrap in paragraph tags
-                    allParagraphs = ['<p>' + chapter.content + '</p>'];
+                    allElements.push({
+                        tag: 'p',
+                        html: '<p>' + chapter.content + '</p>',
+                        textLength: textOnly.length
+                    });
                 }
             }
             
             let currentChunk = '';
             let currentTitle = chapter.title;
 
-            allParagraphs.forEach((para, paraIndex) => {
-                const paraText = para.replace(/<[^>]*>/g, '').trim(); // Strip HTML tags for length check
+            // Helper function to split text by sentences
+            const splitBySentences = (text) => {
+                // Split by sentence endings, but keep the punctuation
+                // Handle common sentence endings: . ! ? and also handle quotes/parentheses
+                const sentences = text.match(/[^.!?]+[.!?]+[\])'"`'"]*\s*|.+$/g) || [text];
+                return sentences.filter(s => s.trim().length > 0);
+            };
+
+            // Helper function to split a long paragraph
+            const splitLongParagraph = (element) => {
+                const textOnly = element.html.replace(/<[^>]*>/g, '');
+                const tag = element.tag;
+                const parts = [];
                 
-                if (currentChunk.length + paraText.length > maxChunkSize && currentChunk.length > 0) {
-                    // Save current chunk
-                    chunks.push({
-                        id: chunkId++,
-                        title: currentTitle,
-                        chapterIndex: chapterIndex,
-                        chapterTitle: chapter.title,
-                        text: currentChunk.trim()
-                    });
-                    currentChunk = '';
-                    currentTitle = null; // Only show title on first chunk of chapter
+                if (textOnly.length <= maxChunkSize) {
+                    // Paragraph fits in one chunk
+                    return [element.html];
                 }
                 
-                // Add paragraph with formatting preserved
-                currentChunk += para;
+                // Split by sentences first
+                const sentences = splitBySentences(textOnly);
+                let currentPart = '';
+                
+                sentences.forEach(sentence => {
+                    const sentenceTrimmed = sentence.trim();
+                    
+                    // Check if adding this sentence would exceed limit
+                    if (currentPart.length > 0 && 
+                        (currentPart.length + sentenceTrimmed.length + 1 > maxChunkSize)) {
+                        // Save current part and start new one
+                        if (currentPart.trim()) {
+                            parts.push(`<${tag}>${currentPart.trim()}</${tag}>`);
+                        }
+                        currentPart = sentenceTrimmed;
+                    } else {
+                        // Add sentence to current part
+                        currentPart += (currentPart ? ' ' : '') + sentenceTrimmed;
+                    }
+                });
+                
+                // Add remaining part
+                if (currentPart.trim()) {
+                    parts.push(`<${tag}>${currentPart.trim()}</${tag}>`);
+                }
+                
+                // Fallback: if splitting by sentences didn't work, split by words
+                if (parts.length === 0 || (parts.length === 1 && parts[0].replace(/<[^>]*>/g, '').length > maxChunkSize)) {
+                    // Split by words as last resort
+                    const words = textOnly.split(/\s+/);
+                    currentPart = '';
+                    parts.length = 0; // Reset
+                    
+                    words.forEach(word => {
+                        if (currentPart.length + word.length + 1 > maxChunkSize && currentPart.length > 0) {
+                            parts.push(`<${tag}>${currentPart.trim()}</${tag}>`);
+                            currentPart = word;
+                        } else {
+                            currentPart += (currentPart ? ' ' : '') + word;
+                        }
+                    });
+                    
+                    if (currentPart.trim()) {
+                        parts.push(`<${tag}>${currentPart.trim()}</${tag}>`);
+                    }
+                }
+                
+                return parts.length > 0 ? parts : [element.html];
+            };
+
+            // Process elements in order
+            allElements.forEach((element, elementIndex) => {
+                const paraText = element.html.replace(/<[^>]*>/g, '').trim();
+                const paraTextLength = paraText.length;
+                
+                // If paragraph is too long, split it
+                if (paraTextLength > maxChunkSize) {
+                    const paragraphParts = splitLongParagraph(element);
+                    
+                    paragraphParts.forEach((part, partIndex) => {
+                        const partText = part.replace(/<[^>]*>/g, '').trim();
+                        
+                        // Check if current chunk + this part would exceed limit
+                        if (currentChunk.length > 0 && 
+                            (currentChunk.length + partText.length > maxChunkSize)) {
+                            // Save current chunk
+                            chunks.push({
+                                id: chunkId++,
+                                title: currentTitle,
+                                chapterIndex: chapterIndex,
+                                chapterTitle: chapter.title,
+                                text: currentChunk.trim()
+                            });
+                            currentChunk = '';
+                            currentTitle = null;
+                        }
+                        
+                        // Add this part to current chunk
+                        currentChunk += part;
+                    });
+                } else {
+                    // Normal paragraph - check if adding it would exceed limit
+                    if (currentChunk.length > 0 && 
+                        (currentChunk.length + paraTextLength > maxChunkSize)) {
+                        // Save current chunk before it gets too long
+                        chunks.push({
+                            id: chunkId++,
+                            title: currentTitle,
+                            chapterIndex: chapterIndex,
+                            chapterTitle: chapter.title,
+                            text: currentChunk.trim()
+                        });
+                        currentChunk = '';
+                        currentTitle = null; // Only show title on first chunk of chapter
+                    }
+                    
+                    // Add paragraph with formatting preserved
+                    currentChunk += element.html;
+                }
             });
 
-            // Add remaining chunk
+            // Add remaining chunk (important - don't lose the last part!)
             if (currentChunk.trim()) {
                 chunks.push({
                     id: chunkId++,
