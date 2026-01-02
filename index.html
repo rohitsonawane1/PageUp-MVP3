@@ -11,14 +11,22 @@
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <!-- EPUB.js library -->
     <script src="https://cdn.jsdelivr.net/npm/epubjs@0.3.88/dist/epub.min.js"></script>
+    <!-- Book Library -->
+    <script src="books.js"></script>
 </head>
 <body>
     <div id="app">
         <!-- EPUB Upload Button -->
         <div id="upload-container">
-            <input type="file" id="epub-input" accept=".epub" style="display: none;">
-            <button id="upload-btn">Upload EPUB</button>
+            <input type="file" id="epub-input" accept=".epub,.html,.htm" style="display: none;">
+            <button id="upload-btn">Upload EPUB or HTML</button>
             <div id="upload-status"></div>
+            
+            <!-- Pre-loaded Books -->
+            <div id="book-library" style="margin-top: 15px; display: flex; flex-direction: column; gap: 8px;">
+                <div style="font-size: 12px; color: rgba(255,255,255,0.6); margin-bottom: 5px;">Or load a pre-loaded book:</div>
+                <!-- Buttons will be dynamically generated here -->
+            </div>
         </div>
         
         <div id="reels-container">

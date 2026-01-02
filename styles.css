@@ -70,6 +70,7 @@ body {
     -webkit-overflow-scrolling: touch;
     padding: 20px;
     text-align: left;
+    white-space: normal; /* Ensure normal text wrapping */
 }
 
 .reel-title {
@@ -84,6 +85,9 @@ body {
 .reel-text {
     font-size: 18px;
     line-height: 1.8;
+    white-space: normal; /* Ensure paragraphs don't collapse */
+    word-wrap: break-word;
+    overflow-wrap: break-word;
     color: #e0e0e0;
     letter-spacing: 0.2px;
     word-spacing: 2px;
@@ -425,16 +429,60 @@ body {
 
 /* Preserve EPUB paragraph formatting */
 .reel-text p {
-    margin-bottom: 1em;
+    margin-bottom: 1.5em !important; /* Increased spacing between paragraphs - force with !important */
+    margin-top: 0 !important;
     text-indent: 1.5em; /* Preserve indentation */
+    line-height: 1.6; /* Better line spacing within paragraphs */
+    display: block; /* Ensure block display */
 }
 
 .reel-text p:first-child {
     text-indent: 0; /* First paragraph no indent */
+    margin-top: 0 !important;
+}
+
+.reel-text p:last-child {
+    margin-bottom: 0 !important; /* No bottom margin on last paragraph */
+}
+
+/* Force spacing between adjacent paragraphs */
+.reel-text p + p {
+    margin-top: 0 !important;
+    margin-bottom: 1.5em !important; /* Ensure spacing between paragraphs */
 }
 
 .reel-text div {
-    margin-bottom: 1em;
+    margin-bottom: 1.5em; /* Increased spacing */
+    margin-top: 0;
+    line-height: 1.6;
+}
+
+.reel-text div:last-child {
+    margin-bottom: 0;
+}
+
+/* Ensure proper spacing between block elements */
+.reel-text p + p {
+    margin-top: 0; /* Remove top margin when paragraphs are adjacent */
+}
+
+.reel-text div + div,
+.reel-text p + div,
+.reel-text div + p {
+    margin-top: 0; /* Consistent spacing */
+}
+
+/* Preserve line breaks */
+.reel-text br {
+    display: block;
+    margin: 0.5em 0; /* Add spacing for line breaks */
+    content: "";
+}
+
+/* Ensure empty paragraphs don't collapse */
+.reel-text p:empty {
+    min-height: 1.5em; /* Maintain spacing for empty paragraphs */
+    margin-bottom: 1.5em;
 }
 
 .reel-text em,
@@ -445,5 +493,14 @@ body {
 .reel-text strong,
 .reel-text b {
     font-weight: 700;
+}
+
+/* Book Library Buttons */
+#book-library button {
+    text-align: left;
+}
+
+#book-library button:active {
+    transform: scale(0.95);
 }
 

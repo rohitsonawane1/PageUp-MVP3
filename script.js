@@ -503,11 +503,62 @@ class EPUBParser {
                 }
                 // Preserve divs (often used for paragraphs in EPUBs) with styles
                 else if (tagName === 'div') {
-                    const divContent = this.extractFormattedText(child).trim();
-                    if (divContent) {
-                        const style = child.getAttribute('style') || '';
-                        const classAttr = child.getAttribute('class') ? `class="${child.getAttribute('class')}"` : '';
-                        html += `<div ${classAttr} ${style ? `style="${style}"` : ''}>${divContent}</div>`;
+                    // Check if div already contains block-level elements (p, div, h1-h6, etc.)
+                    const hasBlockElements = child.querySelector('p, div, h1, h2, h3, h4, h5, h6, section, article');
+                    
+                    if (hasBlockElements) {
+                        // Div already has block structure, process normally
+                        const divContent = this.extractFormattedText(child).trim();
+                        if (divContent) {
+                            const style = child.getAttribute('style') || '';
+                            const classAttr = child.getAttribute('class') ? `class="${child.getAttribute('class')}"` : '';
+                            html += `<div ${classAttr} ${style ? `style="${style}"` : ''}>${divContent}</div>`;
+                        }
+                    } else {
+                        // Div has only text/inline elements - wrap them in <p> tags
+                        let paragraphContent = '';
+                        let currentTextGroup = '';
+                        
+                        const processDivChildren = (node) => {
+                            for (let childNode of node.childNodes) {
+                                if (childNode.nodeType === Node.TEXT_NODE) {
+                                    const text = childNode.textContent.trim();
+                                    if (text) {
+                                        currentTextGroup += (currentTextGroup ? ' ' : '') + text;
+                                    }
+                                } else if (childNode.nodeType === Node.ELEMENT_NODE) {
+                                    const childTag = childNode.tagName.toLowerCase();
+                                    // If we hit a block element or br, finalize current paragraph
+                                    if (['br', 'p', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(childTag)) {
+                                        if (currentTextGroup.trim()) {
+                                            paragraphContent += `<p>${currentTextGroup.trim()}</p>`;
+                                            currentTextGroup = '';
+                                        }
+                                        if (childTag === 'br') {
+                                            paragraphContent += '<br>';
+                                        } else {
+                                            paragraphContent += this.extractFormattedText(childNode);
+                                        }
+                                    } else {
+                                        // Inline element - add to current text group
+                                        currentTextGroup += this.extractFormattedText(childNode);
+                                    }
+                                }
+                            }
+                        };
+                        
+                        processDivChildren(child);
+                        
+                        // Finalize any remaining text as a paragraph
+                        if (currentTextGroup.trim()) {
+                            paragraphContent += `<p>${currentTextGroup.trim()}</p>`;
+                        }
+                        
+                        if (paragraphContent.trim()) {
+                            const style = child.getAttribute('style') || '';
+                            const classAttr = child.getAttribute('class') ? `class="${child.getAttribute('class')}"` : '';
+                            html += `<div ${classAttr} ${style ? `style="${style}"` : ''}>${paragraphContent}</div>`;
+                        }
                     }
                 }
                 // Preserve emphasis
@@ -753,7 +804,10 @@ class EPUBParser {
                             isFirstChunkOfChapter = false; // Subsequent chunks don't get title
                         }
                         
-                        // Add this part to current chunk
+                        // Add this part to current chunk with spacing
+                        if (currentChunk.length > 0 && !currentChunk.endsWith(' ')) {
+                            currentChunk += ' '; // Add space between parts
+                        }
                         currentChunk += part;
                     });
                 } else {
@@ -774,19 +828,27 @@ class EPUBParser {
                     }
                     
                     // Add paragraph with formatting preserved
+                    // Ensure proper spacing - paragraphs should naturally have margin from CSS
                     currentChunk += element.html;
                 }
             });
 
             // Add remaining chunk (important - don't lose the last part!)
             if (currentChunk.trim()) {
+                // Ensure proper HTML structure - normalize whitespace but preserve paragraph tags
+                let finalChunk = currentChunk.trim();
+                // Remove any extra whitespace between tags but keep paragraph structure
+                finalChunk = finalChunk.replace(/>\s+</g, '><'); // Remove whitespace between tags
+                // But ensure paragraphs are properly separated
+                finalChunk = finalChunk.replace(/<\/p><p/g, '</p>\n<p'); // Add newline for readability (doesn't affect rendering)
+                
                 chunks.push({
                     id: chunkId++,
                     title: isFirstChunkOfChapter ? currentTitle : null,
                     chapterIndex: chapterIndex,
                     actualChapterNumber: chapterNumberToUse, // Use the extracted/calculated chapter number
                     chapterTitle: chapter.title,
-                    text: currentChunk.trim()
+                    text: finalChunk
                 });
             }
 
@@ -833,6 +895,267 @@ class EPUBParser {
         });
 
         return chunks;
+    }
+}
+
+// HTML Parser
+class HTMLParser {
+    constructor() {
+        this.document = null;
+    }
+
+    async loadHTML(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const htmlContent = e.target.result;
+                    const parser = new DOMParser();
+                    this.document = parser.parseFromString(htmlContent, 'text/html');
+                    resolve(this.document);
+                } catch (error) {
+                    reject(error);
+                }
+            };
+            reader.onerror = () => reject(new Error('Failed to read file'));
+            reader.readAsText(file);
+        });
+    }
+
+    async extractText() {
+        if (!this.document) return [];
+
+        const chapters = [];
+        
+        // Strategy 1: Look for semantic HTML5 elements (article, section with data attributes)
+        const articles = this.document.querySelectorAll('article[data-chapter], section[data-chapter]');
+        if (articles.length > 0) {
+            articles.forEach((article, index) => {
+                const chapterNumber = article.getAttribute('data-chapter') || 
+                                     article.getAttribute('data-chapter-number') ||
+                                     (index + 1);
+                const chapterTitle = article.getAttribute('data-chapter-title') ||
+                                    article.querySelector('h1, h2, h3')?.textContent?.trim() ||
+                                    null;
+                
+                const content = this.extractFormattedText(article);
+                if (content.trim()) {
+                    chapters.push({
+                        title: chapterTitle,
+                        content: content,
+                        isMetadata: false,
+                        chapterNumberFromIdref: parseInt(chapterNumber, 10) || null
+                    });
+                }
+            });
+        }
+        
+        // Strategy 2: Look for h1/h2 headings as chapter markers
+        if (chapters.length === 0) {
+            const headings = this.document.querySelectorAll('h1, h2');
+            if (headings.length > 0) {
+                let currentChapter = { title: null, content: '', elements: [] };
+                let chapterNumber = 1;
+                
+                const allElements = Array.from(this.document.body.children);
+                
+                allElements.forEach(element => {
+                    const tagName = element.tagName.toLowerCase();
+                    
+                    // Check if this is a chapter heading
+                    if ((tagName === 'h1' || tagName === 'h2') && 
+                        (element.textContent.trim().match(/chapter\s+\d+/i) || 
+                         element.textContent.trim().match(/^\d+\./))) {
+                        
+                        // Save previous chapter if it has content
+                        if (currentChapter.content.trim()) {
+                            chapters.push({
+                                title: currentChapter.title,
+                                content: currentChapter.content,
+                                isMetadata: false,
+                                chapterNumberFromIdref: chapterNumber++
+                            });
+                        }
+                        
+                        // Start new chapter
+                        currentChapter = {
+                            title: element.textContent.trim(),
+                            content: '',
+                            elements: []
+                        };
+                    } else {
+                        // Add to current chapter
+                        currentChapter.elements.push(element);
+                    }
+                });
+                
+                // Add last chapter
+                if (currentChapter.elements.length > 0) {
+                    const tempDiv = document.createElement('div');
+                    currentChapter.elements.forEach(el => {
+                        tempDiv.appendChild(el.cloneNode(true));
+                    });
+                    currentChapter.content = this.extractFormattedText(tempDiv);
+                    
+                    if (currentChapter.content.trim()) {
+                        chapters.push({
+                            title: currentChapter.title,
+                            content: currentChapter.content,
+                            isMetadata: false,
+                            chapterNumberFromIdref: chapterNumber
+                        });
+                    }
+                }
+            }
+        }
+        
+        // Strategy 3: Fallback - treat entire body as one chapter
+        if (chapters.length === 0) {
+            const content = this.extractFormattedText(this.document.body);
+            if (content.trim()) {
+                // Try to extract title from h1 or title tag
+                const title = this.document.querySelector('h1')?.textContent?.trim() ||
+                             this.document.querySelector('title')?.textContent?.trim() ||
+                             null;
+                
+                chapters.push({
+                    title: title,
+                    content: content,
+                    isMetadata: false,
+                    chapterNumberFromIdref: 1
+                });
+            }
+        }
+        
+        return chapters;
+    }
+
+    extractFormattedText(element) {
+        if (!element) return '';
+        
+        let html = '';
+        const children = element.childNodes;
+        
+        for (let child of children) {
+            if (child.nodeType === Node.TEXT_NODE) {
+                const text = child.textContent.trim();
+                if (text) {
+                    html += text + ' ';
+                }
+            } else if (child.nodeType === Node.ELEMENT_NODE) {
+                const tagName = child.tagName.toLowerCase();
+                
+                // Skip unwanted elements
+                if (['script', 'style', 'nav', 'header', 'footer'].includes(tagName)) {
+                    continue;
+                }
+                
+                // Preserve paragraph breaks with styles
+                if (tagName === 'p') {
+                    const paraContent = this.extractFormattedText(child).trim();
+                    if (paraContent) {
+                        const style = child.getAttribute('style') || '';
+                        const classAttr = child.getAttribute('class') ? `class="${child.getAttribute('class')}"` : '';
+                        html += `<p ${classAttr} ${style ? `style="${style}"` : ''}>${paraContent}</p>`;
+                    }
+                }
+                // Preserve line breaks
+                else if (tagName === 'br') {
+                    html += '<br>';
+                }
+                // Preserve divs with styles
+                else if (tagName === 'div') {
+                    const divContent = this.extractFormattedText(child).trim();
+                    if (divContent) {
+                        const style = child.getAttribute('style') || '';
+                        const classAttr = child.getAttribute('class') ? `class="${child.getAttribute('class')}"` : '';
+                        html += `<div ${classAttr} ${style ? `style="${style}"` : ''}>${divContent}</div>`;
+                    }
+                }
+                // Preserve emphasis
+                else if (tagName === 'em' || tagName === 'i') {
+                    html += '<em>' + this.extractFormattedText(child) + '</em>';
+                }
+                else if (tagName === 'strong' || tagName === 'b') {
+                    html += '<strong>' + this.extractFormattedText(child) + '</strong>';
+                }
+                // Preserve spans with styles
+                else if (tagName === 'span') {
+                    const style = child.getAttribute('style') || '';
+                    const classAttr = child.getAttribute('class') ? `class="${child.getAttribute('class')}"` : '';
+                    const spanContent = this.extractFormattedText(child);
+                    if (style || classAttr) {
+                        html += `<span ${classAttr} ${style ? `style="${style}"` : ''}>${spanContent}</span>`;
+                    } else {
+                        html += spanContent;
+                    }
+                }
+                // Preserve headings with their original tags
+                else if (['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(tagName)) {
+                    const headingContent = this.extractFormattedText(child).trim();
+                    if (headingContent) {
+                        const style = child.getAttribute('style') || '';
+                        const classAttr = child.getAttribute('class') ? `class="${child.getAttribute('class')}"` : '';
+                        html += `<${tagName} ${classAttr} ${style ? `style="${style}"` : ''}>${headingContent}</${tagName}>`;
+                    }
+                }
+                // Handle links
+                else if (tagName === 'a') {
+                    const href = child.getAttribute('href') || '';
+                    const linkContent = this.extractFormattedText(child);
+                    if (href) {
+                        html += `<a href="${href}">${linkContent}</a>`;
+                    } else {
+                        html += linkContent;
+                    }
+                }
+                // Handle other inline elements
+                else if (['small', 'sub', 'sup', 'u', 'mark'].includes(tagName)) {
+                    html += `<${tagName}>${this.extractFormattedText(child)}</${tagName}>`;
+                }
+                // Handle block elements
+                else if (['section', 'article', 'main'].includes(tagName)) {
+                    html += this.extractFormattedText(child);
+                }
+                // For everything else, just extract text
+                else {
+                    const childContent = this.extractFormattedText(child);
+                    if (childContent.trim()) {
+                        html += childContent;
+                    }
+                }
+            }
+        }
+        
+        return html;
+    }
+
+    chunkText(chapters, maxChunkSize = 500) {
+        // Reuse the same chunking logic as EPUBParser
+        const tempParser = new EPUBParser();
+        return tempParser.chunkText(chapters, maxChunkSize);
+    }
+
+    async diagnoseHTML() {
+        if (!this.document) return null;
+        
+        const metadata = {
+            title: this.document.querySelector('title')?.textContent || 
+                   this.document.querySelector('h1')?.textContent || 
+                   'No title found',
+            author: this.document.querySelector('meta[name="author"]')?.getAttribute('content') ||
+                   this.document.querySelector('meta[property="author"]')?.getAttribute('content') ||
+                   'Unknown',
+            description: this.document.querySelector('meta[name="description"]')?.getAttribute('content') || ''
+        };
+        
+        const chapters = await this.extractText();
+        
+        return {
+            metadata: metadata,
+            chapters: chapters,
+            totalChapters: chapters.length
+        };
     }
 }
 
@@ -914,6 +1237,12 @@ class TextReels {
             const reelItem = document.createElement('div');
             reelItem.className = 'reel-item';
             if (index === this.currentIndex) reelItem.classList.add('active');
+            
+            // Debug: Log first chunk to verify HTML structure
+            if (index === 0) {
+                console.log('First chunk text (first 500 chars):', chunk.text.substring(0, 500));
+                console.log('Contains <p> tags:', chunk.text.includes('<p>'));
+            }
             
             reelItem.innerHTML = `
                 <div class="text-container">
@@ -1321,39 +1650,80 @@ class TextReels {
         
         // Disable button during loading
         uploadBtn.disabled = true;
-        statusEl.textContent = 'Loading EPUB file...';
+        
+        // Detect file type
+        const fileName = file.name.toLowerCase();
+        const isHTML = fileName.endsWith('.html') || fileName.endsWith('.htm');
+        const isEPUB = fileName.endsWith('.epub');
+        
+        if (!isHTML && !isEPUB) {
+            statusEl.textContent = '✗ Please select an EPUB or HTML file';
+            uploadBtn.disabled = false;
+            setTimeout(() => {
+                statusEl.textContent = '';
+            }, 3000);
+            return;
+        }
+        
+        statusEl.textContent = isHTML ? 'Loading HTML file...' : 'Loading EPUB file...';
         
         try {
-            // Check if epub.js is available
-            if (typeof ePub === 'undefined') {
-                throw new Error('EPUB.js library not loaded. Please refresh the page.');
-            }
+            let parser;
+            let chapters;
+            
+            if (isHTML) {
+                // HTML file processing
+                parser = new HTMLParser();
+                this.parser = parser; // Store parser for re-chunking
+                statusEl.textContent = 'Parsing HTML structure...';
+                
+                await parser.loadHTML(file);
+                statusEl.textContent = 'Analyzing HTML structure...';
+                
+                // Run diagnosis
+                const diagnosis = await parser.diagnoseHTML();
+                if (diagnosis) {
+                    console.log('=== HTML DIAGNOSIS ===');
+                    console.log('Metadata:', diagnosis.metadata);
+                    console.log('Total chapters:', diagnosis.totalChapters);
+                    console.log('Chapters:', diagnosis.chapters);
+                    console.log('========================');
+                }
+                
+                statusEl.textContent = 'Extracting text from chapters...';
+                chapters = await parser.extractText();
+            } else {
+                // EPUB file processing
+                // Check if epub.js is available
+                if (typeof ePub === 'undefined') {
+                    throw new Error('EPUB.js library not loaded. Please refresh the page.');
+                }
 
-            const parser = new EPUBParser();
-            this.parser = parser; // Store parser for re-chunking
-            statusEl.textContent = 'Parsing EPUB structure...';
-            
-            await parser.loadEPUB(file);
-            statusEl.textContent = 'Analyzing EPUB structure...';
-            
-            // Run diagnosis to see what information is available
-            const diagnosis = await parser.diagnoseEPUB();
-            if (diagnosis) {
-                console.log('=== EPUB DIAGNOSIS ===');
-                console.log('Metadata:', diagnosis.metadata);
-                console.log('Total spine items:', diagnosis.spine.length);
-                console.log('Spine items (first 10):', diagnosis.spine.slice(0, 10));
-                console.log('All spine items:', diagnosis.spine);
-                console.log('Navigation/TOC:', diagnosis.navigation);
-                console.log('========================');
+                parser = new EPUBParser();
+                this.parser = parser; // Store parser for re-chunking
+                statusEl.textContent = 'Parsing EPUB structure...';
+                
+                await parser.loadEPUB(file);
+                statusEl.textContent = 'Analyzing EPUB structure...';
+                
+                // Run diagnosis to see what information is available
+                const diagnosis = await parser.diagnoseEPUB();
+                if (diagnosis) {
+                    console.log('=== EPUB DIAGNOSIS ===');
+                    console.log('Metadata:', diagnosis.metadata);
+                    console.log('Total spine items:', diagnosis.spine.length);
+                    console.log('Spine items (first 10):', diagnosis.spine.slice(0, 10));
+                    console.log('All spine items:', diagnosis.spine);
+                    console.log('Navigation/TOC:', diagnosis.navigation);
+                    console.log('========================');
+                }
+                
+                statusEl.textContent = 'Extracting text from chapters...';
+                chapters = await parser.extractText();
             }
-            
-            statusEl.textContent = 'Extracting text from chapters...';
-            
-            const chapters = await parser.extractText();
             
             if (chapters.length === 0) {
-                throw new Error('No text content found in EPUB. The file might be corrupted or empty.');
+                throw new Error(`No text content found in ${isHTML ? 'HTML' : 'EPUB'}. The file might be corrupted or empty.`);
             }
             
             // Store original chapters for re-chunking
@@ -1453,6 +1823,44 @@ class TextReels {
             setTimeout(() => {
                 statusEl.textContent = 'Try uploading again';
             }, 5000);
+        }
+    }
+
+    async loadFromLibrary(bookKey) {
+        const statusEl = document.getElementById('upload-status');
+        const uploadBtn = document.getElementById('upload-btn');
+        
+        if (!BookLibrary || !BookLibrary[bookKey]) {
+            statusEl.textContent = '✗ Book not found in library';
+            setTimeout(() => {
+                statusEl.textContent = '';
+            }, 3000);
+            return;
+        }
+        
+        try {
+            uploadBtn.disabled = true;
+            statusEl.textContent = `Loading ${BookLibrary[bookKey].title}...`;
+            
+            const bookData = BookLibrary[bookKey];
+            const htmlContent = bookData.html;
+            
+            // Create a File-like object from the HTML content
+            const blob = new Blob([htmlContent], { type: 'text/html' });
+            const file = new File([blob], `${bookData.title}.html`, { type: 'text/html' });
+            
+            // Use the existing HTML parser
+            await this.loadEPUB(file);
+            
+            statusEl.textContent = '';
+        } catch (error) {
+            statusEl.textContent = `✗ Error: ${error.message}`;
+            console.error('Error loading from library:', error);
+            setTimeout(() => {
+                statusEl.textContent = '';
+            }, 5000);
+        } finally {
+            uploadBtn.disabled = false;
         }
     }
 
@@ -1773,14 +2181,17 @@ document.addEventListener('DOMContentLoaded', () => {
     
     epubInput.addEventListener('change', async (e) => {
         const file = e.target.files[0];
-        if (file && file.name.endsWith('.epub')) {
-            await reels.loadEPUB(file);
-        } else if (file) {
-            const statusEl = document.getElementById('upload-status');
-            statusEl.textContent = 'Please select an .epub file';
-            setTimeout(() => {
-                statusEl.textContent = '';
-            }, 3000);
+        if (file) {
+            const fileName = file.name.toLowerCase();
+            if (fileName.endsWith('.epub') || fileName.endsWith('.html') || fileName.endsWith('.htm')) {
+                await reels.loadEPUB(file);
+            } else {
+                const statusEl = document.getElementById('upload-status');
+                statusEl.textContent = 'Please select an EPUB or HTML file';
+                setTimeout(() => {
+                    statusEl.textContent = '';
+                }, 3000);
+            }
         }
     });
     
@@ -1897,6 +2308,32 @@ document.addEventListener('DOMContentLoaded', () => {
             doneReadingBtn.disabled = true;
             await reels.handleDoneReading();
             doneReadingBtn.disabled = false;
+        });
+    }
+    
+    // Generate book library buttons
+    const bookLibraryContainer = document.getElementById('book-library');
+    if (bookLibraryContainer && typeof BookLibrary !== 'undefined') {
+        Object.keys(BookLibrary).forEach(bookKey => {
+            const book = BookLibrary[bookKey];
+            const button = document.createElement('button');
+            button.textContent = `Load "${book.title}"`;
+            button.style.cssText = 'padding: 8px 15px; border-radius: 8px; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: #fff; cursor: pointer; font-size: 13px; transition: all 0.2s ease; text-align: left;';
+            button.addEventListener('mouseenter', () => {
+                button.style.background = 'rgba(255,255,255,0.3)';
+            });
+            button.addEventListener('mouseleave', () => {
+                button.style.background = 'rgba(255,255,255,0.2)';
+            });
+            button.addEventListener('click', async () => {
+                await reels.loadFromLibrary(bookKey);
+            });
+            button.addEventListener('touchend', async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                await reels.loadFromLibrary(bookKey);
+            });
+            bookLibraryContainer.appendChild(button);
         });
     }
     
