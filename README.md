@@ -1,42 +1,84 @@
-# PageUp - Text Reels MVP
+# PageUp — Swipe-based Reading MVP
 
-A mobile web prototype for swipeable text chunks in a reels format.
+A mobile web prototype exploring whether **chunked, swipe-based interaction** can reduce friction in mobile long-form reading.
 
-## Quick Start
+This project was built as a **product experiment**, not a full-featured reading application.
 
-1. Open `index.html` in a web browser
-2. For mobile testing:
-   - Option A: Use a local server (recommended)
-     ```bash
-     # Python 3
-     python -m http.server 8000
-     
-     # Node.js (if you have it)
-     npx serve .
-     ```
-   - Option B: Use VS Code Live Server extension
-   - Option C: Upload to a free hosting service (Netlify, Vercel, GitHub Pages)
+---
 
-3. Open on your iPhone:
-   - Make sure your phone and computer are on the same WiFi
-   - Find your computer's IP address (e.g., `192.168.1.100`)
-   - Open Safari on iPhone and go to: `http://192.168.1.100:8000`
+## Problem
 
-## Sharing
+Reading long-form text on mobile devices often feels cognitively heavy, especially in short, frequent reading sessions. Most e-book readers are optimized for page-based navigation or scrolling, which do not align well with gesture-native mobile behavior shaped by short-form media.
 
-- Upload to GitHub Pages, Netlify, or Vercel
-- Share the link - works on any phone browser!
-- No app store needed
+PageUp explores whether **vertical swipe navigation combined with smaller text chunks** changes how readers engage with long-form content on mobile.
 
-## Customization
+---
 
-Edit `script.js` and modify the `textChunks` array to add your own text.
+## Hypothesis
 
-## Features
+Long-form text may feel less cognitively heavy on mobile if content is broken into discrete chunks and navigated using familiar vertical swipe gestures.
 
-- ✅ Smooth swipe gestures
-- ✅ Native-feeling animations
-- ✅ Progress indicator
-- ✅ Works offline (after first load)
-- ✅ Mobile-optimized
+A counter-hypothesis is that chunking could disrupt narrative flow or feel artificial for deep readers.
 
+---
+
+## MVP Scope
+
+The MVP was intentionally scoped to test **interaction quality and learning**, not product completeness.
+
+### Included
+- Vertical swipe-based navigation (forward / backward)
+- Variable text density (Less / Medium / More)
+- Reading progress indicators
+- Basic resume state on the same device
+- Clean, preloaded Chapter 1 of *The Great Gatsby*
+- Optional EPUB upload
+- Session-level reading analytics
+
+### Intentionally excluded
+- Backend or server-side persistence
+- User accounts or authentication
+- Highlights, bookmarks, or annotations
+- Personalization or recommendations
+- Monetization
+- Robust EPUB normalization
+
+---
+
+## Live Demo
+
+👉 **[Add GitHub Pages link here]**
+
+*(Best experienced on a mobile device)*
+
+---
+
+## Tech Stack (brief)
+
+- HTML / CSS / JavaScript
+- EPUB.js for EPUB handling
+- LocalStorage for resume state
+- Google Forms for session-level analytics
+
+---
+
+## Repository Structure
+
+- `index.html` — App shell  
+- `script.js` — Interaction and state logic  
+- `styles.css` — Styling and animations  
+- `books.js` — Preloaded content  
+
+---
+
+## More Context
+
+- 📄 **1-page case study:** `/projects/pageup`  
+- ✍️ **Deep-dive blog:** `/writing/pageup`
+
+---
+
+## Notes
+
+This repository is intentionally lightweight and experimentation-focused.  
+The goal was to learn from real interaction behavior rather than to ship a complete reading product.
