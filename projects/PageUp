@@ -1,0 +1,111 @@
+---
+title: Project PageUp — Case Study
+---
+
+# Project PageUp  
+**Exploring swipe-based interaction for long-form mobile reading**
+
+**Type:** Self-initiated product MVP  
+**Platform:** Mobile web  
+**Role:** End-to-end product ownership (problem framing → MVP → instrumentation)
+
+---
+
+## Problem
+
+Reading long-form text on mobile devices often feels cognitively heavy, especially for short, frequent reading sessions. Existing e-book readers are optimized for page-based or scroll-based interactions, which don’t align well with mobile-native gesture habits shaped by short-form media.
+
+The core question was not about content quality or attention span, but about **interaction design**.
+
+---
+
+## Hypothesis
+
+**Primary hypothesis**  
+Long-form text may feel less cognitively heavy on mobile if content is broken into discrete chunks and navigated via familiar vertical swipe gestures.
+
+**Counter-hypothesis**  
+Chunking could disrupt narrative flow or feel artificial for deep readers.
+
+The MVP was designed as an experiment to observe real usage rather than assume either outcome.
+
+---
+
+## MVP scope (what “done” meant)
+
+The MVP was intentionally scoped to test interaction quality, not to resemble a complete reading product.
+
+- Vertical swipe-based navigation (forward / backward)
+- Mobile Safari compatibility
+- Real long-form content access via:
+  - Preloaded clean Chapter 1 of *The Great Gatsby*
+  - Optional EPUB upload
+- Variable text density (Less / Medium / More)
+- Reading progress indicators
+- Basic resume state on the same device
+- Session-level instrumentation for behavioral signals
+
+Non-goals included backend systems, accounts, personalization, annotations, and monetization.
+
+---
+
+## Key product decisions
+
+- **Swipe vs. scroll or pagination**  
+  Chose vertical swipe to align with existing mobile muscle memory and create discrete reading units.
+
+- **Text density as a variable, not a constant**  
+  Exposed chunk size as a controllable parameter to study its effect on pacing and comfort.
+
+- **Defaults before configuration**  
+  Users start with a medium density to establish a baseline, avoiding upfront decision fatigue.
+
+- **Controlled content input**  
+  Instead of over-engineering EPUB parsing, provided a clean, preloaded chapter to reduce early friction and preserve experimental signal.
+
+- **Explicit session boundaries**  
+  Designed clear start/end points so engagement metrics reflected deliberate reading behavior.
+
+---
+
+## Instrumentation (session-level)
+
+Metrics were captured per session using lightweight Google Form integration, triggered by user actions.
+
+**Signals tracked**
+- Session start / end timestamps
+- Device type
+- Total pages read
+- Last page index
+- Progress percentage
+- Total reading time
+- Average time per page
+- Text density usage (last setting + time spent per mode)
+
+The goal was **directional learning**, not statistical certainty.
+
+---
+
+## Learnings (pre-launch)
+
+- Separating the experiment from the solution helped prevent scope drift into adjacent problems.
+- Defaults materially shape behavior and must be treated as part of experiment design.
+- Defining metrics early clarified which questions the MVP could and could not answer, reducing overbuilding.
+
+---
+
+## Next steps (data-dependent)
+
+- Release to a small group and analyze depth, pacing, drop-off, and density patterns.
+- Refine default text density based on observed behavior.
+- Evolve resume state only if repeat usage indicates sustained reading intent.
+- Improve EPUB normalization only if engagement differs meaningfully from controlled content.
+- Re-evaluate platform direction after learning stabilizes.
+
+---
+
+## Links
+
+- **Live demo:** _(add GitHub Pages link)_
+- **GitHub repository:** https://github.com/rohitsonawane1/PageUp-MVP3
+- **Deep-dive blog:** _(add later)_
