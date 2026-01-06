@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Project PageUp — Case Study</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      max-width: 760px;
+      margin: 40px auto;
+      padding: 0 16px;
+      line-height: 1.6;
+      color: #222;
+    }
+    h1, h2 {
+      line-height: 1.25;
+    }
+    h2 {
+      margin-top: 2em;
+    }
+    ul {
+      padding-left: 1.2em;
+    }
+    hr {
+      margin: 3em 0;
+    }
+    a {
+      color: #0066cc;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+
+<h1>Project PageUp</h1>
+<p><strong>Exploring swipe-based interaction for long-form mobile reading</strong></p>
+
+<hr/>
+
+<h2>Problem</h2>
+<p>
+Reading long-form text on mobile devices often feels cognitively heavy, especially for short, frequent reading sessions. Existing e-book readers are optimized for page-based or scroll-based interactions, which don’t align well with mobile-native gesture habits shaped by short-form media.
+</p>
+<p>
+The core question was not about content quality or attention span, but about <strong>interaction design</strong>.
+</p>
+
+<h2>Hypothesis</h2>
+<p>
+<strong>Primary hypothesis:</strong><br/>
+Long-form text may feel less cognitively heavy on mobile if content is broken into discrete chunks and navigated via familiar vertical swipe gestures.
+</p>
+<p>
+<strong>Counter-hypothesis:</strong><br/>
+Chunking could disrupt narrative flow or feel artificial for deep readers.
+</p>
+
+<h2>MVP scope</h2>
+<ul>
+  <li>Vertical swipe-based navigation</li>
+  <li>Mobile Safari compatibility</li>
+  <li>Preloaded clean Chapter 1 of <em>The Great Gatsby</em></li>
+  <li>Optional EPUB upload</li>
+  <li>Variable text density</li>
+  <li>Reading progress indicators</li>
+  <li>Basic resume state</li>
+  <li>Session-level instrumentation</li>
+</ul>
+
+<h2>Key product decisions</h2>
+<ul>
+  <li>Swipe-based navigation instead of scroll or pagination</li>
+  <li>Text density treated as a product variable</li>
+  <li>Sensible defaults before configuration</li>
+  <li>Controlled content input to preserve signal</li>
+  <li>Explicit session boundaries for analytics</li>
+</ul>
+
+<h2>Instrumentation</h2>
+<ul>
+  <li>Session start and end time</li>
+  <li>Device type</li>
+  <li>Pages read and last page index</li>
+  <li>Progress percentage</li>
+  <li>Total and average reading time</li>
+  <li>Text density usage</li>
+</ul>
+
+<h2>Learnings (pre-launch)</h2>
+<ul>
+  <li>Separating the experiment from the solution prevents scope drift</li>
+  <li>Defaults materially shape behavior</li>
+  <li>Early metric definition clarifies learning boundaries</li>
+</ul>
+
+<h2>Next steps</h2>
+<ul>
+  <li>Release to users and analyze reading behavior</li>
+  <li>Refine default density based on usage</li>
+  <li>Evolve resume state only if repeat usage emerges</li>
+  <li>Improve EPUB normalization only if needed</li>
+</ul>
+
+<h2>Links</h2>
+<ul>
+  <li><a href="https://rohitsonawane1.github.io/PageUp-MVP3/">Live demo</a></li>
+  <li><a href="https://github.com/rohitsonawane1/PageUp-MVP3">GitHub repository</a></li>
+</ul>
+
+</body>
+</html>
