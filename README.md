@@ -47,7 +47,7 @@ The MVP was intentionally scoped to test **interaction quality and learning**, n
 
 ## Live Demo
 
-👉 **[Add GitHub Pages link here]**
+👉 **[https://rohitsonawane1.github.io/PageUp-MVP3/]**
 
 *(Best experienced on a mobile device)*
 
