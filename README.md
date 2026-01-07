@@ -73,7 +73,7 @@ The MVP was intentionally scoped to test **interaction quality and learning**, n
 
 ## More Context
 
-- 📄 **1-page case study:** `/projects/pageup`  
+- 📄 **1-page case study:** https://rohitsonawane1.github.io/PageUp-MVP3/projects/PageUp.html
 - ✍️ **Deep-dive blog:** 
 
 ---
