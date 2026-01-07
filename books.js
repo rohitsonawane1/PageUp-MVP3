@@ -3,7 +3,7 @@ const BookLibrary = {
     'The Great Gatsby - Chapter 1': {
         title: 'The Great Gatsby - Chapter 1',
         html: `
-<div id="chapter-1">
+
 <p>
 In my younger and more vulnerable years my father gave me some advice that I've been turning over in my mind ever since.
 </p>
